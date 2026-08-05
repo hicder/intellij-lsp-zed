@@ -218,48 +218,16 @@ mkdir -p "$CACHE_DIR"
 cat <<SPLICE
 
 ╔═══════════════════════════════════════════════════════════════════════════╗
-║  ${BOLD}Add the following blocks to ${CYAN}~/.config/zed/settings.json${NC}            ║
-╠═══════════════════════════════════════════════════════════════════════════╣
-
-  ${BOLD}"lsp"${NC}: {
-    ${BOLD}"intellij-server"${NC}: {
-      ${BOLD}"binary"${NC}: {
-        ${BOLD}"path"${NC}: "${GREEN}$LAUNCHER${NC}",
-        ${BOLD}"arguments"${NC}: [
-          "--stdio",
-          "--system-path",
-          "${GREEN}$CACHE_DIR${NC}"
-        ]
-      },
-      ${BOLD}"initialization_options"${NC}: {
-        ${BOLD}"eulaHash"${NC}: "${GREEN}$EULA_HASH${NC}"
-      }
-    }
-  },
-
-  // Inside the existing "languages" object, update Java and Kotlin:
-  ${BOLD}"languages"${NC}: {
-    ${BOLD}"Java"${NC}: {
-      ${BOLD}"language_servers"${NC}: ["${GREEN}intellij-server${NC}", "${GREEN}!jdtls${NC}"]
-    },
-    ${BOLD}"Kotlin"${NC}: {
-      ${BOLD}"language_servers"${NC}: ["${GREEN}intellij-server${NC}", "${GREEN}!kotlin-language-server${NC}"]
-    }
-  }
-
-╚═══════════════════════════════════════════════════════════════════════════╝
-
-  ${YELLOW}Notes:${NC}
-  • The ${BOLD}!prefix${NC} disables Zed's default Java/Kotlin servers.
-    If you still want jdtls/kotlin-ls for some features, remove the !.
-  • Preview builds have a ${BOLD}30-day evaluation${NC}. Run this script again
-    periodically to get the latest build.
-  • JVM args: add ${BOLD}--jvm-arg${NC} flags to the arguments list, e.g.:
-    ${BOLD}"--jvm-arg=-Xmx4096m"${NC}
-
-╔═══════════════════════════════════════════════════════════════════════════╗
 ║  ${BOLD}Server installed at:${NC} ${SERVER_DIR}
-║  Run again with:  ${CYAN}./scripts/install.sh${NC}
+║
+║  ${BOLD}Next steps:${NC}
+║    1. Install the extension (see intellij-lsp-zed.md)
+║    2. Add to ${CYAN}~/.config/zed/settings.json${NC}:
+║       ${BOLD}"Java"${NC}:   { "language_servers": ["intellij-server", "!jdtls"] }
+║       ${BOLD}"Kotlin"${NC}: { "language_servers": ["intellij-server", "!kotlin-language-server"] }
+║    3. ${CYAN}Cmd+Shift+P${NC} → ${CYAN}zed: reload${NC}
+║
+║  Run again: ${CYAN}./scripts/install.sh${NC}
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
 SPLICE
@@ -286,31 +254,21 @@ cat > "$OUTPUT_FILE" <<MDEOF
 
 ---
 
-## 1. Add the \`"lsp"\` block to your \`~/.config/zed/settings.json\`
+## 1. Install the extension
 
-Insert it **before** the existing \`"languages"\` block:
+Copy the extension files to Zed's extensions directory:
 
-\`\`\`json
-"lsp": {
-  "intellij-server": {
-    "binary": {
-      "path": "${LAUNCHER}",
-      "arguments": [
-        "--stdio",
-        "--system-path",
-        "${CACHE_DIR}"
-      ]
-    },
-    "initialization_options": {
-      "eulaHash": "${EULA_HASH}"
-    }
-  }
-},
+\`\`\`sh
+mkdir -p ~/Library/Application\\ Support/Zed/extensions/installed/intellij-lsp-zed/
+cp extension.wasm extension.toml \\
+  ~/Library/Application\\ Support/Zed/extensions/installed/intellij-lsp-zed/
 \`\`\`
+
+On Linux, use \`~/.local/share/zed/extensions/installed/\`.
 
 ---
 
-## 2. Update the \`"languages"\` block
+## 2. Configure \`~/.config/zed/settings.json\`
 
 Add \`"language_servers"\` inside both \`"Java"\` and \`"Kotlin"\`:
 
@@ -351,21 +309,6 @@ Open a Java or Kotlin project. The server will auto-import Maven/Gradle/Bazel pr
 
 \`\`\`json
 {
-  "lsp": {
-    "intellij-server": {
-      "binary": {
-        "path": "${LAUNCHER}",
-        "arguments": [
-          "--stdio",
-          "--system-path",
-          "${CACHE_DIR}"
-        ]
-      },
-      "initialization_options": {
-        "eulaHash": "${EULA_HASH}"
-      }
-    }
-  },
   "languages": {
     "Java": {
       "language_servers": ["intellij-server", "!jdtls"]
