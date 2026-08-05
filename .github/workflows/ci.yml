@@ -51,7 +51,7 @@ jobs:
         run: npm ci
 
       - name: Format check (Prettier)
-        run: npx prettier --check '**/*.{md,json,jsonc,toml,yml,yaml}'
+        run: npx prettier --check '**/*.{md,json,jsonc,yml,yaml}'
 
       - name: Lint commit messages (last commit)
         if: github.event_name == 'pull_request'

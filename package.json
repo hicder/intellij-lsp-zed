@@ -17,7 +17,7 @@
   },
   "lint-staged": {
     "*.rs": "bash -c 'cargo fmt -- && cargo clippy -- -D warnings'",
-    "*.{md,json,jsonc,toml,yml,yaml,css,html}": "prettier --write"
+    "*.{md,json,jsonc,yml,yaml,css,html}": "prettier --write"
   },
   "keywords": [
     "zed",
