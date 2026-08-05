@@ -97,6 +97,39 @@ Restart Zed (`Cmd+Shift+P` → `zed: reload`) and open a Java or Kotlin project.
   source (Zed doesn't support `jar://` URIs yet). Your own code navigation
   works fine.
 
+## Releases
+
+Push a version tag to trigger an automatic GitHub release:
+
+```sh
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+The `release.yml` workflow will:
+
+1. Build the `.wasm` extension
+2. Create a GitHub Release with `extension.wasm` + `extension.toml` attached
+3. Attempt to update the submodule in your fork of `zed-industries/extensions`
+
+### Extension registry (one-time setup)
+
+1. Fork [zed-industries/extensions](https://github.com/zed-industries/extensions)
+2. Add this repo as a submodule:
+   ```sh
+   git clone https://github.com/YOU/extensions
+   cd extensions
+   git submodule add https://github.com/hlucas13/intellij-lsp-zed extensions/intellij-lsp-zed
+   git commit -m "add intellij-lsp-zed extension"
+   git push
+   ```
+3. Open a PR to `zed-industries/extensions`
+4. Create a [personal access token](https://github.com/settings/tokens) with
+   `repo` scope and add it as `EXTENSIONS_REPO_PAT` in your repo secrets
+
+After merge, the extension appears in Zed's extension browser
+(`Cmd+Shift+P` → `zed: extensions`).
+
 ## License
 
 [MIT](LICENSE) — the extension and install script are MIT-licensed.
