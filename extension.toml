@@ -1,0 +1,18 @@
+id = "intellij-lsp-zed"
+name = "IntelliJ LSP"
+version = "0.1.0"
+schema_version = 1
+description = "IntelliJ IDEA LSP server for Java and Kotlin"
+repository = "https://github.com/hlucas13/intellij-lsp-zed"
+authors = ["Homero Lucas do Prado"]
+languages = []
+capabilities = []
+
+[lib]
+kind = "Rust"
+version = "0.7.0"
+
+[language_servers.intellij-server]
+name = "IntelliJ Language Server"
+language = "Java"
+languages = ["Java", "Kotlin"]

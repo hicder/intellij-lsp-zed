@@ -1,0 +1,27 @@
+// Example Zed configuration — run ./scripts/install.sh to generate
+// a version of this file with your actual paths and EULA hash filled in.
+//
+// Merge the "lsp" block and the "language_servers" lines into your
+// ~/.config/zed/settings.json. Restart Zed to apply.
+
+{
+  "lsp": {
+    "intellij-server": {
+      "binary": {
+        "path": "~/.local/share/intellij-lsp/server-<version>/bin/intellij-server",
+        "arguments": ["--stdio", "--system-path", "~/.cache/intellij-lsp-zed"],
+      },
+      "initialization_options": {
+        "eulaHash": "<first-16-chars-of-sha256-of-EULA.txt>",
+      },
+    },
+  },
+  "languages": {
+    "Java": {
+      "language_servers": ["intellij-server", "!jdtls"],
+    },
+    "Kotlin": {
+      "language_servers": ["intellij-server", "!kotlin-language-server"],
+    },
+  },
+}

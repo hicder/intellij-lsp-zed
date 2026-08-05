@@ -1,0 +1,11 @@
+target/
+node_modules/
+
+# Downloaded VSIX files (optional local cache)
+vsix/*.vsix
+
+# Generated instructions
+intellij-lsp-zed.md
+
+# macOS junk
+.DS_Store

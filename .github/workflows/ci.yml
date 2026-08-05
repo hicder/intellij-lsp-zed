@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format check (Rust)
+        run: cargo fmt -- --check
+
+      - name: Clippy
+        run: cargo clippy --target wasm32-wasip2 -- -D warnings
+
+      - name: Run tests
+        run: cargo test
+
+      - name: Build extension
+        run: cargo build --release --target wasm32-wasip2
+
+      - name: Verify .wasm matches committed
+        run: |
+          if [ -f extension.wasm ]; then
+            cmp target/wasm32-wasip2/release/intellij_lsp_zed.wasm extension.wasm \
+              && echo "extension.wasm is up to date" \
+              || echo "::warning::extension.wasm is out of date — run 'cargo build --release --target wasm32-wasip2' and commit the result"
+          else
+            echo "::warning::extension.wasm not found in repo — consider committing it so users don't need Rust to install"
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Format check (Prettier)
+        run: npx prettier --check '**/*.{md,json,jsonc,toml,yml,yaml}'
+
+      - name: Lint commit messages (last commit)
+        if: github.event_name == 'pull_request'
+        run: npx commitlint --from HEAD~1 --to HEAD --verbose
