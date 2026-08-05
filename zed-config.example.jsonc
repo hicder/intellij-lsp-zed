@@ -1,21 +1,15 @@
-// Example Zed configuration — run ./scripts/install.sh to generate
-// a version of this file with your actual paths and EULA hash filled in.
+// Zed configuration example — add these lines to ~/.config/zed/settings.json.
 //
-// Merge the "lsp" block and the "language_servers" lines into your
-// ~/.config/zed/settings.json. Restart Zed to apply.
+// The "intellij-server" language server is provided by the extension.
+// Install it first:
+//   1. Run ./scripts/install.sh to download the LSP server
+//   2. Copy extension.wasm + extension.toml to Zed's extensions folder:
+//      mkdir -p ~/Library/Application\ Support/Zed/extensions/installed/intellij-lsp-zed/
+//      cp extension.wasm extension.toml ~/Library/Application\ Support/Zed/extensions/installed/intellij-lsp-zed/
+//
+// Restart Zed (Cmd+Shift+P → zed: reload) after any changes.
 
 {
-  "lsp": {
-    "intellij-server": {
-      "binary": {
-        "path": "~/.local/share/intellij-lsp/server-<version>/bin/intellij-server",
-        "arguments": ["--stdio", "--system-path", "~/.cache/intellij-lsp-zed"],
-      },
-      "initialization_options": {
-        "eulaHash": "<first-16-chars-of-sha256-of-EULA.txt>",
-      },
-    },
-  },
   "languages": {
     "Java": {
       "language_servers": ["intellij-server", "!jdtls"],
