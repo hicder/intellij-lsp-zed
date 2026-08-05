@@ -1,13 +1,9 @@
-// Zed configuration example — add these lines to ~/.config/zed/settings.json.
+// Optional Zed configuration — add these lines to ~/.config/zed/settings.json
+// only if you want to use the IntelliJ server for Java/Kotlin instead of
+// Zed's built-in servers.
 //
-// The "intellij-server" language server is provided by the extension.
-// Install it first:
-//   1. Run ./scripts/install.sh to download the LSP server
-//   2. Copy extension.wasm + extension.toml to Zed's extensions folder:
-//      mkdir -p ~/Library/Application\ Support/Zed/extensions/installed/intellij-lsp-zed/
-//      cp extension.wasm extension.toml ~/Library/Application\ Support/Zed/extensions/installed/intellij-lsp-zed/
-//
-// Restart Zed (Cmd+Shift+P → zed: reload) after any changes.
+// The extension is fully self-contained: it downloads the IntelliJ LSP server
+// automatically on first launch. No other setup needed.
 
 {
   "languages": {

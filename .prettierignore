@@ -2,3 +2,4 @@ target/
 node_modules/
 Cargo.lock
 *.toml
+.github/workflows/

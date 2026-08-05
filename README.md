@@ -42,27 +42,11 @@ The `!` prefix disables Zed's built-in servers to avoid duplicate diagnostics.
 
 ## How It Works
 
-1. The extension checks if the IntelliJ LSP server is installed
-2. If not, it downloads the latest version from JetBrains CDN (~368 MB)
-3. The archive is extracted to a platform-specific directory
-4. The server reads the bundled `EULA.txt` and computes the acceptance hash
+1. The extension checks if the IntelliJ LSP server is already downloaded
+2. If not, it fetches the latest version info from Open VSX
+3. The server bundle (~368 MB) downloads and extracts automatically
+4. The EULA acceptance hash is computed from the bundled `EULA.txt`
 5. Your project is imported (Maven/Gradle/Bazel) and language features activate
-
-## Platform Defaults
-
-|                  | macOS                                                     | Linux                                      | Windows                                    |
-| ---------------- | --------------------------------------------------------- | ------------------------------------------ | ------------------------------------------ |
-| Server install   | `~/Library/Application Support/intellij-lsp`              | `~/.local/share/intellij-lsp`              | `%LOCALAPPDATA%\intellij-lsp`              |
-| Cache / logs     | `~/Library/Caches/intellij-lsp-zed`                       | `~/.cache/intellij-lsp-zed`                | `%LOCALAPPDATA%\intellij-lsp-zed`          |
-| Extension folder | `~/Library/Application Support/Zed/extensions/installed/` | `~/.local/share/zed/extensions/installed/` | `%LOCALAPPDATA%\Zed\extensions\installed\` |
-
-## Environment Variables
-
-| Variable                 | Description                       |
-| ------------------------ | --------------------------------- |
-| `INTELLIJ_LSP_HOME`      | Override server install directory |
-| `INTELLIJ_LSP_CACHE`     | Override server cache / logs      |
-| `INTELLIJ_LSP_EULA_HASH` | Skip auto-detection of EULA hash  |
 
 ## Development
 
