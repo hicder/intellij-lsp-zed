@@ -1,0 +1,106 @@
+name: Auto-update server
+
+on:
+  schedule:
+    # Every Monday at 8am UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch latest server version
+        id: server
+        run: |
+          RESPONSE=$(curl -sL "https://open-vsx.org/api/JetBrains/intellij-server/latest")
+          VERSION=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('version','unknown'))" 2>/dev/null)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if version changed
+        id: check
+        run: |
+          LATEST="${{ steps.server.outputs.version }}"
+          if [ -f .last-server-version ]; then
+            CURRENT=$(cat .last-server-version)
+          else
+            CURRENT="none"
+          fi
+          echo "latest=$LATEST"
+          echo "current=$CURRENT"
+
+          if [ "$LATEST" != "$CURRENT" ] && [ "$LATEST" != "unknown" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "$LATEST" > .last-server-version
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install Rust
+        if: steps.check.outputs.changed == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+
+      - name: Cache dependencies
+        if: steps.check.outputs.changed == 'true'
+        uses: Swatinem/rust-cache@v2
+
+      - name: Rebuild extension
+        if: steps.check.outputs.changed == 'true'
+        run: cargo build --release --target wasm32-wasip2
+
+      - name: Update extension.wasm
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          cp target/wasm32-wasip2/release/intellij_lsp_zed.wasm extension.wasm
+
+      - name: Commit and create tag
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          VERSION="${{ steps.server.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Commit changes (if any)
+          git add .last-server-version extension.wasm
+          git diff --staged --quiet || git commit -m "chore: track server version $VERSION"
+
+          # Create tag
+          TAG="v${VERSION}"
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag "$TAG"
+          fi
+
+          git push origin main --tags
+
+      - name: Trigger release workflow
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = 'v${{ steps.server.outputs.version }}';
+            console.log(`Release tag ${tag} pushed — release workflow will handle the rest`);
+
+      - name: Open issue if nothing changed
+        if: steps.check.outputs.changed != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'server-update'
+            });
+            if (issues.data.length === 0) {
+              console.log('No update needed this week.');
+            }
