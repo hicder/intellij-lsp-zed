@@ -12,10 +12,11 @@
     "build": "cargo build --release --target wasm32-wasip2",
     "lint": "cargo clippy --target wasm32-wasip2 -- -D warnings",
     "fmt": "cargo fmt -- --check",
+    "fmt:fix": "cargo fmt --",
     "ci": "npm run fmt && npm run lint && npm run build && npm run test"
   },
   "lint-staged": {
-    "*.rs": "bash -c 'cargo fmt -- --check && cargo clippy -- -D warnings'",
+    "*.rs": "bash -c 'cargo fmt -- && cargo clippy -- -D warnings'",
     "*.{md,json,jsonc,toml,yml,yaml,css,html}": "prettier --write"
   },
   "keywords": [
