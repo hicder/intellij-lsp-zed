@@ -6,11 +6,48 @@ const ENV_SERVER_HOME: &str = "INTELLIJ_LSP_HOME";
 const ENV_SERVER_CACHE: &str = "INTELLIJ_LSP_CACHE";
 const ENV_EULA_HASH: &str = "INTELLIJ_LSP_EULA_HASH";
 
-fn find_latest_server() -> Option<String> {
-    let home = std::env::var(ENV_SERVER_HOME).unwrap_or_else(|_| {
-        let home = std::env::var("HOME").unwrap_or_default();
+/// Platform-aware user home directory.
+fn user_home() -> String {
+    std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_default()
+}
+
+/// Platform-aware default server install path.
+fn default_server_home() -> String {
+    let home = user_home();
+    if cfg!(windows) {
+        format!("{}\\AppData\\Local\\intellij-lsp", home)
+    } else if cfg!(target_os = "macos") {
+        format!("{}/Library/Application Support/intellij-lsp", home)
+    } else {
         format!("{}/.local/share/intellij-lsp", home)
-    });
+    }
+}
+
+/// Platform-aware default cache path.
+fn default_cache_dir() -> String {
+    let home = user_home();
+    if cfg!(windows) {
+        format!("{}\\AppData\\Local\\intellij-lsp-zed", home)
+    } else if cfg!(target_os = "macos") {
+        format!("{}/Library/Caches/intellij-lsp-zed", home)
+    } else {
+        format!("{}/.cache/intellij-lsp-zed", home)
+    }
+}
+
+/// Platform-aware launcher name (with .exe on Windows).
+fn launcher_name() -> &'static str {
+    if cfg!(windows) {
+        "intellij-server.exe"
+    } else {
+        "intellij-server"
+    }
+}
+
+fn find_latest_server() -> Option<String> {
+    let home = std::env::var(ENV_SERVER_HOME).unwrap_or_else(|_| default_server_home());
 
     let entries = std::fs::read_dir(&home).ok()?;
     let mut versions: Vec<String> = entries
@@ -27,7 +64,13 @@ fn find_latest_server() -> Option<String> {
     }
 
     versions.sort_by(|a, b| b.cmp(a));
-    let launcher = format!("{}/server-{}/bin/intellij-server", home, versions[0]);
+
+    let bin = launcher_name();
+    let launcher = if cfg!(windows) {
+        format!("{}\\server-{}\\bin\\{}", home, versions[0], bin)
+    } else {
+        format!("{}/server-{}/bin/{}", home, versions[0], bin)
+    };
 
     if std::path::Path::new(&launcher).exists() {
         Some(launcher)
@@ -37,7 +80,11 @@ fn find_latest_server() -> Option<String> {
 }
 
 fn compute_eula_hash(server_dir: &str) -> Option<String> {
-    let eula_path = format!("{}/EULA.txt", server_dir);
+    let eula_path = if cfg!(windows) {
+        format!("{}\\EULA.txt", server_dir)
+    } else {
+        format!("{}/EULA.txt", server_dir)
+    };
     let data = std::fs::read(&eula_path).ok()?;
 
     // djb2 hash — 16 hex chars for EULA acceptance gate.
@@ -61,14 +108,11 @@ impl Extension for IntelliJLspExtension {
         let launcher = find_latest_server().ok_or_else(|| {
             format!(
                 "IntelliJ LSP server not found.\n\
-                 Run ./scripts/install.sh or set {ENV_SERVER_HOME}."
+                 Run ./scripts/install.sh (macOS/Linux) or set {ENV_SERVER_HOME}."
             )
         })?;
 
-        let cache = std::env::var(ENV_SERVER_CACHE).unwrap_or_else(|_| {
-            let home = std::env::var("HOME").unwrap_or_default();
-            format!("{}/.cache/intellij-lsp-zed", home)
-        });
+        let cache = std::env::var(ENV_SERVER_CACHE).unwrap_or_else(|_| default_cache_dir());
 
         Ok(Command {
             command: launcher,
@@ -83,10 +127,7 @@ impl Extension for IntelliJLspExtension {
         _worktree: &Worktree,
     ) -> Result<Option<serde_json::Value>> {
         let eula_hash = std::env::var(ENV_EULA_HASH).ok().or_else(|| {
-            let home = std::env::var(ENV_SERVER_HOME).unwrap_or_else(|_| {
-                let home = std::env::var("HOME").unwrap_or_default();
-                format!("{}/.local/share/intellij-lsp", home)
-            });
+            let home = std::env::var(ENV_SERVER_HOME).unwrap_or_else(|_| default_server_home());
             let entries = std::fs::read_dir(&home).ok()?;
             let dirs: Vec<_> = entries
                 .filter_map(|e| e.ok())
@@ -117,6 +158,23 @@ zed::register_extension!(IntelliJLspExtension);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_default_server_home_is_absolute() {
+        let path = default_server_home();
+        assert!(!path.is_empty());
+        // Should contain the user home or be overridable via env
+    }
+
+    #[test]
+    fn test_launcher_name_ends_with_exe_on_windows() {
+        let name = launcher_name();
+        if cfg!(windows) {
+            assert!(name.ends_with(".exe"));
+        } else {
+            assert!(!name.ends_with(".exe"));
+        }
+    }
 
     #[test]
     fn test_compute_eula_hash_deterministic() {

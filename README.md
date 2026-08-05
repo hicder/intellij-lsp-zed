@@ -25,11 +25,19 @@ writes `intellij-lsp-zed.md` with setup instructions.
 ```sh
 cargo build --release --target wasm32-wasip2
 cp target/wasm32-wasip2/release/intellij_lsp_zed.wasm extension.wasm
+
+# macOS
 cp extension.wasm extension.toml \
   ~/Library/Application\ Support/Zed/extensions/installed/intellij-lsp-zed/
-```
 
-On Linux the extensions folder is `~/.local/share/zed/extensions/installed/`.
+# Linux
+cp extension.wasm extension.toml \
+  ~/.local/share/zed/extensions/installed/intellij-lsp-zed/
+
+# Windows (PowerShell)
+copy extension.wasm "$env:LOCALAPPDATA\Zed\extensions\installed\intellij-lsp-zed\"
+copy extension.toml "$env:LOCALAPPDATA\Zed\extensions\installed\intellij-lsp-zed\"
+```
 
 ### 3. Configure Zed
 
@@ -50,23 +58,31 @@ Restart Zed (`Cmd+Shift+P` → `zed: reload`) and open a Java or Kotlin project.
 
 ## How It Works
 
-1. The extension auto-discovers the latest server version at
-   `~/.local/share/intellij-lsp/server-<version>/`.
+1. The extension auto-discovers the latest server version at the
+   platform-specific install path (see table below).
 2. On first launch, it reads the bundled `EULA.txt` and computes the acceptance
    hash automatically.
-3. The server index is stored at `~/.cache/intellij-lsp-zed/`.
+3. The server index is stored at the platform-specific cache path.
+
+## Platform Defaults
+
+|                  | macOS                                                     | Linux                                      | Windows                                        |
+| ---------------- | --------------------------------------------------------- | ------------------------------------------ | ---------------------------------------------- |
+| Server install   | `~/Library/Application Support/intellij-lsp`              | `~/.local/share/intellij-lsp`              | `%LOCALAPPDATA%\\intellij-lsp`                 |
+| Cache / logs     | `~/Library/Caches/intellij-lsp-zed`                       | `~/.cache/intellij-lsp-zed`                | `%LOCALAPPDATA%\\intellij-lsp-zed`             |
+| Extension folder | `~/Library/Application Support/Zed/extensions/installed/` | `~/.local/share/zed/extensions/installed/` | `%LOCALAPPDATA%\\Zed\\extensions\\installed\\` |
 
 ## Environment Variables
 
-| Variable                 | Default                       | Description              |
-| ------------------------ | ----------------------------- | ------------------------ |
-| `INTELLIJ_LSP_HOME`      | `~/.local/share/intellij-lsp` | Server install directory |
-| `INTELLIJ_LSP_CACHE`     | `~/.cache/intellij-lsp-zed`   | Server cache / logs      |
-| `INTELLIJ_LSP_EULA_HASH` | (computed from EULA.txt)      | Skip auto-detection      |
+| Variable                 | Description                       |
+| ------------------------ | --------------------------------- |
+| `INTELLIJ_LSP_HOME`      | Override server install directory |
+| `INTELLIJ_LSP_CACHE`     | Override server cache / logs      |
+| `INTELLIJ_LSP_EULA_HASH` | Skip auto-detection of EULA hash  |
 
 ## Requirements
 
-- **macOS** or **Linux**
+- **macOS**, **Linux**, or **Windows**
 - **Zed** editor (any recent version)
 - **Rust** (only to build the extension Wasm)
 - ~370 MB free disk space for the server bundle
