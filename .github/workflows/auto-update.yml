@@ -86,6 +86,8 @@ jobs:
           git add server-artifacts.json extension.wasm extension.toml Cargo.toml Cargo.lock package.json package-lock.json scripts/
           git commit -m "chore: auto-update pinned server to ${{ steps.check.outputs.newest }} (v${{ steps.bump.outputs.version }})" || echo "No changes to commit"
           git push origin main
+          git tag -a "v${{ steps.bump.outputs.version }}" -m "v${{ steps.bump.outputs.version }} — auto-updated server pin"
+          git push origin "v${{ steps.bump.outputs.version }}"
 
       - name: Update extensions registry fork
         if: steps.check.outputs.changed == 'true'
