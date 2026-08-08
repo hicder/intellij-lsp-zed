@@ -38,6 +38,17 @@ inspections, and quick-fixes for Maven, Gradle, and Bazel projects.
 3. Open a Java or Kotlin project. The server (~368 MB) is downloaded once from
    JetBrains' CDN and reused on subsequent launches.
 
+### Install from the repository (dev extension)
+
+1. Clone the repository:
+   ```sh
+   git clone https://github.com/hlucas13/intellij-lsp-zed.git
+   ```
+2. In Zed: `Cmd+Shift+P` → `zed: install dev extension`, select the cloned
+   folder.
+3. No Rust toolchain needed — the pre-built `extension.wasm` is committed to
+   the repo. Re-run `git pull` and reinstall to update.
+
 ### Using a manually downloaded server
 
 If you prefer full control, download the server from the [JetBrains
