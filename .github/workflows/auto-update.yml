@@ -23,7 +23,7 @@ jobs:
           echo "== Fetch Open VSX API (maintainer tooling, 1 req/2 weeks) =="
           META=$(curl -fsSL --max-time 60 "https://open-vsx.org/api/JetBrains/intellij-server/latest")
           NEWEST=$(python3 -c "import json,sys; print(json.load(sys.stdin)['version'])" <<< "$META")
-          CURRENT=$(python3 -c "import json; print(json.load(open('server-artifacts.json'))['version'])")
+          CURRENT=$(python3 -c "import json; print(json.load(open('server-artifacts.json'))['vsix_version'])")
           echo "Newest vsix : $NEWEST"
           echo "Current pin : $CURRENT"
           if [ "$NEWEST" = "$CURRENT" ]; then

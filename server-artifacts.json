@@ -1,5 +1,6 @@
 {
   "version": "263.2689.0",
+  "vsix_version": "0.0.8",
   "platforms": {
     "mac-x86_64": {
       "url": "https://download.jetbrains.com/language-server/intellij-server/263.2689.0/intellij-server-263.2689.0.sit",

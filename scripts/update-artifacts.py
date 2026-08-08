@@ -24,7 +24,8 @@ platforms = {
     "win32-arm64": "windows-aarch64",
 }
 
-result: dict = {"version": VSIX_VERSION, "platforms": {}}
+result: dict = {"version": "", "vsix_version": VSIX_VERSION, "platforms": {}}
+server_version = None
 
 for plat, key in platforms.items():
     url = url_tpl.format(plat=plat)
@@ -35,6 +36,9 @@ for plat, key in platforms.items():
         ["unzip", "-p", vsix, "extension/server-bundle.json"]
     )
     bundle = json.loads(bundle_raw)
+    if server_version is None:
+        server_version = bundle["version"]
+        result["version"] = server_version
     archive = bundle.get("archiveName", "")
     file_type = "gzip-tar" if archive.endswith(".tar.gz") else "zip"
     result["platforms"][key] = {
@@ -47,4 +51,4 @@ for plat, key in platforms.items():
 with open(ARTIFACTS_PATH, "w") as f:
     json.dump(result, f, indent=2)
     f.write("\n")
-print(f"Updated {ARTIFACTS_PATH}")
+print(f"Updated {ARTIFACTS_PATH} (server {result['version']}, vsix {VSIX_VERSION})")
