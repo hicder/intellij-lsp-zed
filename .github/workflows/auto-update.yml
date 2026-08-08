@@ -1,0 +1,136 @@
+name: Auto-update pinned server
+
+on:
+  schedule:
+    # The 1st and 15th of each month — stable ~13–17 day interval.
+    - cron: '0 10 1,15 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for new JetBrains vsix release
+        id: check
+        run: |
+          set -e
+          echo "== Fetch Open VSX API (maintainer tooling, 1 req/2 weeks) =="
+          META=$(curl -fsSL --max-time 60 "https://open-vsx.org/api/JetBrains/intellij-server/latest")
+          NEWEST=$(python3 -c "import json,sys; print(json.load(sys.stdin)['version'])" <<< "$META")
+          CURRENT=$(python3 -c "import json; print(json.load(open('server-artifacts.json'))['version'])")
+          echo "Newest vsix : $NEWEST"
+          echo "Current pin : $CURRENT"
+          if [ "$NEWEST" = "$CURRENT" ]; then
+            echo "Pin is current — nothing to do."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "New version available — proceeding with auto-update."
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "newest=$NEWEST" >> "$GITHUB_OUTPUT"
+
+      - name: Download vsixes and update server-artifacts.json
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          python3 scripts/update-artifacts.py "${{ steps.check.outputs.newest }}"
+
+      - name: Install Rust
+        if: steps.check.outputs.changed == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+
+      - name: Cache dependencies
+        if: steps.check.outputs.changed == 'true'
+        uses: Swatinem/rust-cache@v2
+
+      - name: Rebuild extension
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          cargo build --release --target wasm32-wasip2
+          cp target/wasm32-wasip2/release/intellij_lsp_zed.wasm extension.wasm
+
+      - name: Setup Node.js
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Bump version
+        if: steps.check.outputs.changed == 'true'
+        id: bump
+        run: |
+          NEW_VER=$(python3 scripts/bump-version.py)
+          echo "New version: $NEW_VER"
+          echo "version=$NEW_VER" >> "$GITHUB_OUTPUT"
+
+      - name: Update lockfile
+        if: steps.check.outputs.changed == 'true'
+        run: cargo generate-lockfile
+
+      - name: Run tests
+        if: steps.check.outputs.changed == 'true'
+        run: cargo test
+
+      - name: Commit and push
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add server-artifacts.json extension.wasm extension.toml Cargo.toml Cargo.lock package.json package-lock.json scripts/
+          git commit -m "chore: auto-update pinned server to ${{ steps.check.outputs.newest }} (v${{ steps.bump.outputs.version }})" || echo "No changes to commit"
+          git push origin main
+
+      - name: Update extensions registry fork
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.EXTENSIONS_REPO_PAT }}
+          script: |
+            const { execSync } = require('child_process');
+            const version = '${{ steps.bump.outputs.version }}';
+            const extId = 'intellij-lsp';
+            const owner = context.repo.owner;
+            const registryOwner = 'hlucas13';
+            const registryRepo = 'extensions';
+
+            // Clone the extensions fork
+            execSync(`git clone https://x-access-token:${process.env.GH_TOKEN}@github.com/${registryOwner}/${registryRepo}.git /tmp/extensions`, { stdio: 'inherit' });
+            process.chdir('/tmp/extensions');
+
+            execSync('git config user.name "github-actions[bot]"');
+            execSync('git config user.email "github-actions[bot]@users.noreply.github.com"');
+
+            // Sync fork with upstream
+            execSync('git remote add upstream https://github.com/zed-industries/extensions.git 2>/dev/null || true');
+            execSync('git fetch upstream main');
+            execSync('git checkout main');
+            execSync('git merge upstream/main --no-edit || true');
+
+            // Update submodule
+            const branchName = `update-${extId}-${version}`;
+            execSync(`git checkout -b ${branchName}`);
+            execSync(`git submodule update --remote extensions/${extId}`);
+            execSync('git add .');
+            execSync(`git commit -m "chore: bump ${extId} to v${version} (auto-updated server pin)" || echo "Nothing to commit"`);
+            execSync(`git push https://x-access-token:${process.env.GH_TOKEN}@github.com/${registryOwner}/${registryRepo}.git ${branchName} --force`);
+
+            // Open PR to zed-industries/extensions
+            const pr = await github.rest.pulls.create({
+              owner: 'zed-industries',
+              repo: 'extensions',
+              title: `chore: update ${extId} to v${version}`,
+              head: `${registryOwner}:${branchName}`,
+              base: 'main',
+              body: `Auto-updated pinned IntelliJ LSP server to **${{ steps.check.outputs.newest }}**.\n\nServer version bumped automatically by CI.  No manual changes.`,
+            });
+            console.log(`PR created: ${pr.data.html_url}`);
+        env:
+          GH_TOKEN: ${{ secrets.EXTENSIONS_REPO_PAT }}
+          NEWEST: ${{ steps.check.outputs.newest }}

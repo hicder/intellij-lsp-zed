@@ -18,59 +18,76 @@ use zed_extension_api::{
 // JetBrains' own CDN, pinned to a verified version, and only after the user has
 // explicitly accepted the EULA (see the `accept_jetbrains_eula` setting).
 //
-// The URL below was extracted once from the `extension/server-bundle.json`
-// inside the platform-specific `.vsix` (that's a ~1.4 MB wrapper distributed
-// via Open VSX — it is NOT the ~368 MB server bundle, and it is NOT queried
-// at runtime).  The sha256 is the official checksum from the same bundle file,
-// verified with `shasum -a 256` after download.
+// The pinned version and platform URLs live in `server-artifacts.json`,
+// which was built from the official `extension/server-bundle.json` inside
+// each platform's `.vsix` wrapper.  The file is embedded at compile time so
+// the WASM binary carries the pin — no runtime queries needed.  A CI workflow
+// (`auto-update.yml`) updates the JSON whenever JetBrains publishes a new
+// build, so the pin stays current without manual maintenance.
 //
-// The pinned version and URLs must be updated whenever JetBrains publishes a
-// new build.  See the README section "Updating the pinned server" for the
-// one-time, browser-level procedure.
-const SERVER_VERSION: &str = "263.2689.0";
+// See the README section "Updating the pinned server" for how the JSON
+// was originally captured and how to verify it.
 
-// Per-platform download URL + expected sha256, captured from the official
-// `server-bundle.json` inside each platform's .vsix wrapper.  The suffixes
-// match exactly what JetBrains publishes — no guesswork.
-struct PlatformArtifact<'a> {
-    url: &'a str,
-    file_type: DownloadedFileType,
+use std::collections::HashMap;
+
+#[derive(Debug, Deserialize)]
+struct ServerArtifactsFile {
+    version: String,
+    platforms: HashMap<String, PlatformEntry>,
 }
 
-fn platform_artifact() -> Result<PlatformArtifact<'static>> {
-    let platform = zed::current_platform();
-    match (platform.0, platform.1) {
-        (zed::Os::Mac, zed::Architecture::X8664) => Ok(PlatformArtifact {
-            url: "https://download.jetbrains.com/language-server/intellij-server/263.2689.0/intellij-server-263.2689.0.sit",
-            file_type: DownloadedFileType::Zip,
-        }),
-        (zed::Os::Mac, zed::Architecture::Aarch64) => Ok(PlatformArtifact {
-            url: "https://download.jetbrains.com/language-server/intellij-server/263.2689.0/intellij-server-263.2689.0-aarch64.sit",
-            file_type: DownloadedFileType::Zip,
-        }),
-        (zed::Os::Linux, zed::Architecture::X8664) => Ok(PlatformArtifact {
-            url: "https://download.jetbrains.com/language-server/intellij-server/263.2689.0/intellij-server-263.2689.0.tar.gz",
-            file_type: DownloadedFileType::GzipTar,
-        }),
-        (zed::Os::Linux, zed::Architecture::Aarch64) => Ok(PlatformArtifact {
-            url: "https://download.jetbrains.com/language-server/intellij-server/263.2689.0/intellij-server-263.2689.0-aarch64.tar.gz",
-            file_type: DownloadedFileType::GzipTar,
-        }),
-        (zed::Os::Windows, zed::Architecture::X8664) => Ok(PlatformArtifact {
-            url: "https://download.jetbrains.com/language-server/intellij-server/263.2689.0/intellij-server-263.2689.0.win.zip",
-            file_type: DownloadedFileType::Zip,
-        }),
-        (zed::Os::Windows, zed::Architecture::Aarch64) => Ok(PlatformArtifact {
-            url: "https://download.jetbrains.com/language-server/intellij-server/263.2689.0/intellij-server-263.2689.0-aarch64.win.zip",
-            file_type: DownloadedFileType::Zip,
-        }),
-        _ => Err(format!(
-            "IntelliJ LSP server build not available for your platform ({:?}-{:?}). \
-             You can still use the extension by downloading the server manually and \
-             setting \"server_path\". See https://blog.jetbrains.com/idea/2026/08/intellij-idea-goes-lsp/",
-            platform.0, platform.1,
-        )),
+#[derive(Debug, Deserialize)]
+struct PlatformEntry {
+    url: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    sha256: Option<String>,
+    file_type: String,
+}
+
+fn server_artifacts() -> Result<ServerArtifactsFile, String> {
+    serde_json::from_str(include_str!("../server-artifacts.json"))
+        .map_err(|e| format!("failed to parse server-artifacts.json: {e}"))
+}
+
+/// Maps `zed::current_platform()` to the key used in `server-artifacts.json`.
+fn platform_key(os: &zed::Os, arch: &zed::Architecture) -> &'static str {
+    match (os, arch) {
+        (zed::Os::Mac, zed::Architecture::Aarch64) => "mac-aarch64",
+        (zed::Os::Mac, _) => "mac-x86_64",
+        (zed::Os::Linux, zed::Architecture::Aarch64) => "linux-aarch64",
+        (zed::Os::Linux, _) => "linux-x86_64",
+        (zed::Os::Windows, zed::Architecture::Aarch64) => "windows-aarch64",
+        (zed::Os::Windows, _) => "windows-x86_64",
     }
+}
+
+/// Returns `(version, download_url, file_type)` for the current platform.
+fn artifact_for_platform() -> Result<(String, String, DownloadedFileType), String> {
+    let data = server_artifacts()?;
+    let platform = zed::current_platform();
+    let key = platform_key(&platform.0, &platform.1);
+    let entry = data
+        .platforms
+        .get(key)
+        .ok_or_else(|| {
+            format!(
+                "IntelliJ LSP server build not available for your platform ({:?}-{:?}). \
+                 You can still use the extension by downloading the server manually and \
+                 setting \"server_path\". See https://blog.jetbrains.com/idea/2026/08/intellij-idea-goes-lsp/",
+                platform.0, platform.1,
+            )
+        })?;
+    let file_type = match entry.file_type.as_str() {
+        "zip" => DownloadedFileType::Zip,
+        "gzip-tar" => DownloadedFileType::GzipTar,
+        other => {
+            return Err(format!(
+                "unknown file type in server-artifacts.json: {other}"
+            ))
+        }
+    };
+    Ok((data.version.clone(), entry.url.clone(), file_type))
 }
 
 // The EULA hash must match the one the real extension computes from the
@@ -371,17 +388,11 @@ impl IntelliJLspExtension {
         }
 
         // Automatic mode: download the pinned build from JetBrains' CDN.
-        let version = settings
-            .server_version
-            .clone()
-            .unwrap_or_else(|| SERVER_VERSION.to_string());
-        let url = if let Some(url) = settings.server_download_url.clone() {
-            url
-        } else {
-            platform_artifact()?.url.to_string()
-        };
+        let (pinned_version, url, file_type) = artifact_for_platform()?;
+        let version = settings.server_version.clone().unwrap_or(pinned_version);
+        let url = settings.server_download_url.clone().unwrap_or(url);
 
-        self.download_server(language_server_id, &version, &url)
+        self.download_server(language_server_id, &version, &url, file_type)
     }
 
     fn download_server(
@@ -389,6 +400,7 @@ impl IntelliJLspExtension {
         language_server_id: &LanguageServerId,
         version: &str,
         url: &str,
+        file_type: DownloadedFileType,
     ) -> Result<String> {
         set_language_server_installation_status(
             language_server_id,
@@ -402,9 +414,7 @@ impl IntelliJLspExtension {
                 &LanguageServerInstallationStatus::Downloading,
             );
 
-            let artifact = platform_artifact()
-                .map_err(|e| format!("cannot determine server download for this platform: {e}"))?;
-            download_file(url, &version_dir, artifact.file_type).map_err(|e| {
+            download_file(url, &version_dir, file_type).map_err(|e| {
                 format!("failed to download the IntelliJ LSP server ({version}): {e}")
             })?;
         }

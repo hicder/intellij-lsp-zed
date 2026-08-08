@@ -2,8 +2,8 @@ name: Monitor extension health
 
 on:
   schedule:
-    # Weekly on Monday at 9am UTC
-    - cron: '0 9 * * 1'
+    # The 1st and 15th of each month.
+    - cron: '0 9 1,15 * *'
   workflow_dispatch:
 
 permissions:
@@ -22,12 +22,12 @@ jobs:
           # Developer tooling only — NOT the extension at runtime.
           #
           # The extension NEVER queries the Open VSX API.  This CI workflow
-          # queries it *once a week* (a single request from the maintainer's
-          # CI) purely to detect when JetBrains publishes a new build, so the
-          # maintainer can bump the pins in `src/lib.rs`.  This is the same
-          # traffic as a human opening the Open VSX web page in a browser once
-          # a week — not bulk, not automated per-user-install.
-          echo "== Fetch Open VSX API (maintainer tooling, 1 req/week) =="
+          # queries it *once every 2 weeks* (a single request from the
+          # maintainer's CI) purely to detect when JetBrains publishes a new
+          # build, so the maintainer can bump the pins.  This is the same
+          # traffic as a human opening the Open VSX web page in a browser
+          # once every 2 weeks — not bulk, not automated per-user-install.
+          echo "== Fetch Open VSX API (maintainer tooling, 1 req/2 weeks) =="
           META=$(curl -fsSL --max-time 60 "https://open-vsx.org/api/JetBrains/intellij-server/latest")
           if [ -z "$META" ]; then
             echo "FAILED: Open VSX API returned empty response"
@@ -46,13 +46,11 @@ jobs:
             exit 1
           fi
 
-          # The pinned *server* version (from server-bundle.json) is
-          # different from the vsix version.  We track the vsix version
-          # because whenever JetBrains pushes a new vsix, the server bundle
-          # URL inside it changes too.
-          PINNED=$(sed -n 's/.*SERVER_VERSION: &str = "\([^"]*\)".*/\1/p' src/lib.rs)
+          # The pinned *server* version lives in server-artifacts.json
+          # (previously was a constant in src/lib.rs).
+          PINNED=$(python3 -c "import json; print(json.load(open('server-artifacts.json'))['version'])")
           if [ -z "$PINNED" ]; then
-            echo "WARNING: could not parse SERVER_VERSION from src/lib.rs"
+            echo "WARNING: could not parse version from server-artifacts.json"
             echo "version=unknown" >> "$GITHUB_OUTPUT"
             exit 1
           fi
@@ -60,14 +58,11 @@ jobs:
           echo "Pinned server version: $PINNED"
           echo "Newest vsix version : $NEWEST"
 
-          # Compares the vsix version: if the published vsix is newer than
-          # what's pinned, the bundled server version inside it is likely
-          # newer too.  Truncate to dotted-numeric for comparison.
           echo "pinned=$PINNED" >> "$GITHUB_OUTPUT"
           echo "newest=$NEWEST" >> "$GITHUB_OUTPUT"
 
-          # Verify the pinned JetBrains CDN URL is still reachable.
-          URL=$(sed -n 's|.*url: "\(https://download.jetbrains.com/[^"]*\)".*|\1|p' src/lib.rs | head -1)
+          # Verify the first pinned JetBrains CDN URL is still reachable.
+          URL=$(python3 -c "import json; d=json.load(open('server-artifacts.json')); print(next(iter(d['platforms'].values()))['url'])")
           if [ -n "$URL" ]; then
             echo "== Verify pinned CDN URL =="
             STATUS=$(curl -s -o /dev/null -w '%{http_code}' -I -L --max-time 60 "$URL")
@@ -156,10 +151,10 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: '⚠️ Extension health check failed',
-              body: `The weekly health check failed.  This means either the Open VSX API is unreachable/empty, the response format changed, or the pinned JetBrains CDN URL is dead.
+              body: `The biweekly health check failed.  This means either the Open VSX API is unreachable/empty, the response format changed, or the pinned JetBrains CDN URL is dead.
 
             Check the failing step in the workflow run for the exact error.
 
-            If the server download chain is broken, update the pins in \`src/lib.rs\` (\`platform_artifact()\` for each platform).  See README → "Updating the pinned server".`,
+            If the server download chain is broken, update the pins in \`server-artifacts.json\` (\`platform_artifact()\` for each platform).  See README → "Updating the pinned server".`,
               labels: ['extension-broken']
             });

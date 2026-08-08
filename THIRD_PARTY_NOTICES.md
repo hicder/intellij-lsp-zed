@@ -19,8 +19,9 @@
 
 ## IntelliJ LSP server download
 
-- **Source**: JetBrains' CDN, pinned to a verified version in `src/lib.rs`
-  (`platform_artifact()`).
+- **Source**: JetBrains' CDN, pinned to a verified version in
+  [`server-artifacts.json`](server-artifacts.json) and embedded in the
+  extension at compile time via `platform_artifact()`.
 - The extension does not query third-party registry APIs (such as the Open VSX
   API) at runtime.
 - **Integrity**: the official sha256 hash from `extension/server-bundle.json`
