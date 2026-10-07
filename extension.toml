@@ -5,8 +5,11 @@ schema_version = 1
 description = "IntelliJ IDEA LSP server for Java and Kotlin — requires accepting the JetBrains EULA in settings"
 repository = "https://github.com/hlucas13/intellij-lsp-zed"
 authors = ["Homero Lucas do Prado"]
-languages = []
 capabilities = []
+
+[grammars.java]
+repository = "https://github.com/tree-sitter/tree-sitter-java"
+commit = "94703d5a6bed02b98e438d7cad1136c01a60ba2c"
 
 [lib]
 kind = "Rust"
