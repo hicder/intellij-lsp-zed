@@ -1,0 +1,3 @@
+[submodule "grammars/java"]
+	path = grammars/java
+	url = https://github.com/tree-sitter/tree-sitter-java
